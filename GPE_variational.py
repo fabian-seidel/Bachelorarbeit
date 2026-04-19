@@ -27,18 +27,20 @@ def diff_mod(t, sigmadsigma, Omega, p, q, Omega_mod):
 def sigma_t_plot(N = 1000, T = 50, U=6):
     D = 3
     sigma_0 = scipy.optimize.root(ddsigma, [2] * D, args=(1, U)).x
-    sigma_init = 1.01*sigma_0
-    sigma_init[-1] = 0.99*sigma_0[-1]
+    sigma_init = 0.01+sigma_0
+    sigma_init[-1] = sigma_0[-1]-0.01
     sigmadsigma_init = np.concatenate([sigma_init, np.zeros(D)])
     t_eval = np.linspace(0, T, N)
     sol = scipy.integrate.solve_ivp(diff, (0, T), sigmadsigma_init, args=(1, U), t_eval=t_eval)
     sigma_x = sol.y[0, :]
     sigma_z = sol.y[2, :]
-    plt.plot(t_eval,sigma_x)
-    plt.plot(t_eval,sigma_z)
+    plt.plot(t_eval,sigma_x, label=r'$\sigma_x$')
+    plt.plot(t_eval,sigma_z, label=r'$\sigma_z$')
+    plt.legend()
+    plt.title('Quadrupole dynamics of Gaussian ansatz, D = 3, U = 6')
     plt.show()
 
-def sigma_t_plot_mod(N = 10000, T = 600, p=4, q=3, Omega_mod=2.01):
+def sigma_t_plot_mod(N = 10000, T = 20, p=4, q=3, Omega_mod=4.5):
     D = 3
     sigma_0 = scipy.optimize.root(ddsigma, [2] * D, args=(1, p)).x
     sigma_init = 1.01*sigma_0
@@ -49,10 +51,13 @@ def sigma_t_plot_mod(N = 10000, T = 600, p=4, q=3, Omega_mod=2.01):
     sigma_x = sol.y[0, :]
     # sigma_z = sol.y[2, :]
     plt.plot(sol.t,sigma_x)
+    plt.xlabel('t')
+    plt.ylabel(r'$\sigma_x$')
+    plt.title(f'Breathing mode dynamics with driving frequency {Omega_mod}')
     # plt.plot(t_eval,sigma_z)
     plt.show()
 
-def resonanceamplitude_plot(N = 10000, T = 600, p=4, q=3):
+def resonanceamplitude_plot(N = 1000, T = 600, p=4, q=3):
     D = 3
     sigma_0 = scipy.optimize.root(ddsigma, [2] * D, args=(1, p)).x
     sigma_init = sigma_0
@@ -61,14 +66,18 @@ def resonanceamplitude_plot(N = 10000, T = 600, p=4, q=3):
     sigmadsigma_init = np.concatenate([sigma_init, np.zeros(D)])
     t_eval = np.linspace(0, T, N)
     ampl = []
-    Omega_mods = np.linspace(1, 5, 100)
+    Omega_mods = np.linspace(1, 5, 200)
     for Omega_mod in Omega_mods:
-        sol = scipy.integrate.solve_ivp(diff_mod, (0, T), sigmadsigma_init, args=(1, p, q, Omega_mod), t_eval=t_eval,
+        sol = scipy.integrate.solve_ivp(diff_mod, (0, T), sigmadsigma_init, args=(1, p, q, Omega_mod),
                                         method='Radau')
         sigma_x = sol.y[0, :]
         ampl.append((np.max(sigma_x) - np.min(sigma_x)) / 2)
     # sigma_z = sol.y[2, :]
     plt.scatter(Omega_mods, ampl, marker = '.')
+    plt.yscale('log')
+    plt.xlabel('Driving frequency')
+    plt.ylabel('Amplitude')
+    plt.title(r'Amplitude $(\sigma_{max}-\sigma_{min})$/2 for different driving frequencies')
     # plt.plot(t_eval,sigma_z)
     plt.show()
 
@@ -79,19 +88,23 @@ def fft_plot(N = 10000, T = 500, U=25):
     D = 3
     sigma_0 = scipy.optimize.root(ddsigma, [2] * D, args=(1, U)).x
     sigma_init = 1.01 * sigma_0
-    sigma_init[-1] = 0.99 * sigma_0[-1]
+    # sigma_init[-1] = 0.99 * sigma_0[-1]
     sigmadsigma_init = np.concatenate([sigma_init, np.zeros(D)])
     sol = scipy.integrate.solve_ivp(diff, (0,T), sigmadsigma_init, args=(1,U), t_eval=t_eval)
     sigma_x=sol.y[0,:]
     sigma_x_centered = sigma_x - np.mean(sigma_x)
     sigma_x_f = scipy.fft.fft(sigma_x_centered)
     freq = scipy.fft.fftfreq(N, dt)
+    omega_max = 2*np.pi*freq[np.argmax(sigma_x_f)]
     # plt.plot(sol.t,sigma_x)
+    plt.axvline(omega_max, color='orange')
     plt.plot(2*np.pi*freq[:N//20],np.abs(sigma_x_f[:N//20]))
+    plt.xlabel(r'$\omega$')
+    plt.title('Breathing mode dynamics of Gaussian ansatz (FFT) \n' r'D = 3, U = 25, $\omega_{max}$' f' = {omega_max:.2f}')
     plt.show()
 
 
-def freq_U_plot(N=10000, T=500, U_max=25):
+def freq_U_plot(N=10000, T=500, U_max=100):
     Us = []
     omegas = []
     D = 1
@@ -100,7 +113,7 @@ def freq_U_plot(N=10000, T=500, U_max=25):
         t_eval=np.linspace(0,T,N)
         sigma_0=scipy.optimize.root(ddsigma, [2]*D, args=(1,U)).x
         sigma_init=sigma_0*1.01
-        sigma_init[-1]=sigma_0[-1]*0.99
+        # sigma_init[-1]=sigma_0[-1]*0.99
         sigmadsigma_init=np.pad(sigma_init,((0,D),))
         sol = scipy.integrate.solve_ivp(diff, (0,T), sigmadsigma_init, args=(1,U), t_eval=t_eval)
         sigma_x = sol.y[0,:]
@@ -109,10 +122,14 @@ def freq_U_plot(N=10000, T=500, U_max=25):
         crossings_idx = np.where(crossings)[0]
         omegas.append(2*np.pi*np.sum(crossings)/((crossings_idx[-1]-crossings_idx[0])*T/N))
     plt.scatter(Us,omegas,marker='.')
+    plt.title(r'$\omega$ of the breathing mode for different U with D = 1')
+    plt.ylabel(r'$\omega$')
+    plt.xlabel('U')
     plt.show()
 
 # sigma_t_plot_mod()
-freq_U_plot()
+# sigma_t_plot()
+# freq_U_plot()
 # sinfittest()
 # fft_plot()
-# resonanceamplitude_plot()
+resonanceamplitude_plot()
