@@ -120,7 +120,7 @@ def freq_U_plot(N=10000, T=500, U_max=100):
         sigma_x_centered = sigma_x - np.mean(sigma_x)
         crossings = (sigma_x_centered[:-1]>0)&(sigma_x_centered[1:]<0)
         crossings_idx = np.where(crossings)[0]
-        omegas.append(2*np.pi*np.sum(crossings)/((crossings_idx[-1]-crossings_idx[0])*T/N))
+        omegas.append(2*np.pi*(np.sum(crossings)-1)/((crossings_idx[-1]-crossings_idx[0])*T/N))
     plt.scatter(Us,omegas,marker='.')
     plt.title(r'$\omega$ of the breathing mode for different U with D = 1')
     plt.ylabel(r'$\omega$')

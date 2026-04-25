@@ -136,7 +136,7 @@ def energy_U_plot(U_max = 25, x_max = 14, tau_max = 10, dtau = 0.001, dx= 0.025)
     plt.legend()
     plt.show()
 
-def time_ev_4th(x, psi0, ts, Us):
+def psi_time_ev_4th(x, psi0, ts, Us):
     num_x = len(x)
     dx = x[1]-x[0]
     c0 = -2**(1/3)/(2-2**(1/3))
@@ -150,7 +150,7 @@ def time_ev_4th(x, psi0, ts, Us):
     # psi = dx*np.exp(-x**2/(2*sigma**2))/(sigma*np.sqrt(2*np.pi))
     psi = psi0
     psi = np.fft.fft(psi)
-    radius = np.zeros(len(ts))
+    psis = np.zeros((len(ts),num_x), dtype=np.complex128)
     for idx, t in enumerate(ts):
         for factor_num in range(3,0,-1):
             psi *= Ma[factor_num]
@@ -162,16 +162,30 @@ def time_ev_4th(x, psi0, ts, Us):
         psi *= Ma[0]
         psi = np.fft.ifft(psi, n=num_x)
         psi /= np.sqrt(np.trapezoid(np.abs(psi) ** 2, x))
-        radius[idx] = np.sqrt(2 * x ** 2 @ np.abs(psi) ** 2 * dx)
+        psis[idx] = psi
         psi = np.fft.fft(psi)
-    return radius
+    # np.save(f'tspsis_U{np.max(Us)}',np.array((ts,psis)))
+    return ts, psis
 
-def Uquench_time_ev(U_0 = 1, U_max = 2):
+def radius_time_ev_4th(x, psi0, ts, Us):
+    dx = x[1] - x[0]
+    ts, psis = psi_time_ev_4th(x, psi0, ts, Us)
+    radius = np.sqrt(2*np.matmul(np.abs(psis) ** 2 * dx,x ** 2))
+    return ts, radius
+
+def pos_time_ev_4th(x, psi0, ts, Us):
+    dx = x[1] - x[0]
+    ts, psis = psi_time_ev_4th(x, psi0, ts, Us)
+    pos = np.matmul(np.abs(psis)**2*dx,x)
+    return ts, pos
+
+def Uquench_time_ev(U_0 = 1, U_max = 2, t_max = 19, num_t = 100000):
     x, psi0 = imaginary_time_ev_2nd(U = U_0)
-    ts = np.linspace(-1,199,int(1e6))
+    ts = np.linspace(-1,t_max,num_t)
     Us = np.minimum(U_max*np.ones_like(ts), U_max+(U_max-U_0)*ts)
-    radius = time_ev_4th(x, psi0, ts, Us)
-    np.save('radiusU20.npy',radius)
+    ts, radius = radius_time_ev_4th(x, psi0, ts, Us)
+    np.save(f'ts_radius_U{U_max}_t{t_max}.npy',(ts, radius))
+    # return ts, radius
     plt.plot(ts, radius)
     plt.xlabel('t')
     plt.ylabel('width')
@@ -179,10 +193,11 @@ def Uquench_time_ev(U_0 = 1, U_max = 2):
     plt.show()
 
 def plot_fft():
-    radius = np.load('radiusU2.npy')[10000:]
-    radius = radius - np.mean(radius)
-    radius_fft = np.abs(np.fft.fft(radius))
-    omega = 2 * np.pi * np.fft.fftfreq(len(radius), 100/1e6)
+    ts, radius = np.load('ts_radius_U2_t20.npy')
+    ts, radius = ts[ts > 0], radius[ts > 0]
+    radius_centered = radius - np.mean(radius)
+    radius_fft = np.abs(np.fft.fft(radius_centered))
+    omega = 2 * np.pi * np.fft.fftfreq(len(radius), ts[1]-ts[0])
     plot_range = (omega>0) & (omega<4)
     omega_max = omega[np.argmax(radius_fft[plot_range])+1]
     plt.axvline(omega_max)
@@ -192,10 +207,56 @@ def plot_fft():
     plt.title(r'FFT of GPE radius dynamics after U quench from 1 to 20, $\omega_{max}$ =' f' {omega_max:.2f}')
     plt.show()
 
+def omega_U_plot():
+    Us = np.linspace(0,20,15)
+    omegas = []
+    for U in Us:
+        # ts, radius = Uquench_time_ev(U_0 = U*0.9, U_max = U)
+        ts, radius = np.load(f'ts_radius_U{U}_t19.npy')
+        ts, radius = ts[ts>0], radius[ts>0]
+        radius_centered = radius - np.mean(radius)
+        crossings = (radius_centered[:-1] > 0) & (radius_centered[1:] < 0)
+        crossings_idx = np.where(crossings)[0]
+        omegas.append(2 * np.pi * (np.sum(crossings)-1) / ((crossings_idx[-1] - crossings_idx[0]) * (ts[1]-ts[0])))
+    plt.scatter(Us, omegas, marker='.', label='numerical GPE')
+    Us = np.linspace(0,20,100)
+    omegas = []
+    for U in Us:
+        omega_0 = scipy.optimize.root(ddsigma, [2], args=(1, U)).x
+        omegas.append(np.sqrt(1+3/omega_0**4+2*U/(np.sqrt(2*np.pi)*omega_0**3)))
+    plt.plot(Us, omegas, label='Gaussian')
+    plt.title(r'$\omega$ of the breathing mode for different U with D = 1')
+    plt.ylabel(r'$\omega$')
+    plt.xlabel('U')
+    plt.axhline(np.sqrt(3), color='red', label='Thomas-Fermi')
+    plt.legend()
+    plt.show()
+
+def dipoleomega_U_plot():
+    Us = np.linspace(0, 20, 10)
+    omegas = []
+    x_max = 14
+    for U in Us:
+        x, psi0 = imaginary_time_ev_2nd(U=U, x_max=x_max)
+        x += 1
+        ts = np.linspace(0,20,10000)
+        U_ts = np.ones_like(ts)*U
+        ts, pos = pos_time_ev_4th(x, psi0, ts, U_ts)
+        crossings = (pos[:-1] > 0) & (pos[1:] < 0)
+        crossings_idx = np.where(crossings)[0]
+        omegas.append(2 * np.pi * (np.sum(crossings) - 1) / ((crossings_idx[-1] - crossings_idx[0]) * (ts[1] - ts[0])))
+    plt.scatter(Us, omegas, marker='.')
+    plt.title(r'dipole frequency $\omega$ for different U with D = 1')
+    plt.ylabel(r'$\omega$')
+    plt.xlabel('U')
+    plt.show()
+
 # U = 25
 # x, psi = imaginary_time_ev_2nd(U = U)
 # psisq_x_plot(x, psi, U)
 # radius_U_plot()
 # energy_U_plot()
 # Uquench_time_ev()
-plot_fft()
+# plot_fft()
+# omega_U_plot()
+dipoleomega_U_plot()
