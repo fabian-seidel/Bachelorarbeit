@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.optimize
 import matplotlib.pyplot as plt
+import pyfftw
 
 def ddsigma(sigma, Omega, U):
     D = len(sigma)
@@ -134,8 +135,67 @@ def energy_U_plot(U_max = 25, x_max = 14, tau_max = 10, dtau = 0.001, dx= 0.025)
     plt.title('Energy of the 1D GPE ground state for different approximations')
     plt.legend()
     plt.show()
+
+def time_ev_4th(x, psi0, ts, Us):
+    num_x = len(x)
+    dx = x[1]-x[0]
+    c0 = -2**(1/3)/(2-2**(1/3))
+    c1 = 1/(2-2**(1/3))
+    a = np.array([c1/2,(c0+c1)/2,(c0+c1)/2,c1/2])
+    b = np.array([c1,c0,c1])
+    k_sq = (2*np.pi*np.fft.fftfreq(num_x, d=dx))**2
+    dt = ts[1] - ts[0]
+    Ma = np.exp(-1j*dt*np.outer(a,k_sq)/2)
+    pot = x**2/2
+    # psi = dx*np.exp(-x**2/(2*sigma**2))/(sigma*np.sqrt(2*np.pi))
+    psi = psi0
+    psi = np.fft.fft(psi)
+    radius = np.zeros(len(ts))
+    for idx, t in enumerate(ts):
+        for factor_num in range(3,0,-1):
+            psi *= Ma[factor_num]
+            psi = np.fft.ifft(psi, n = num_x)
+            psi /= np.sqrt(np.trapezoid(np.abs(psi)**2, x))
+            Mb = np.exp(b[factor_num-1]*1j*dt*(-pot-Us[idx]*np.abs(psi)**2))
+            psi *= Mb
+            psi = np.fft.fft(psi)
+        psi *= Ma[0]
+        psi = np.fft.ifft(psi, n=num_x)
+        psi /= np.sqrt(np.trapezoid(np.abs(psi) ** 2, x))
+        radius[idx] = np.sqrt(2 * x ** 2 @ np.abs(psi) ** 2 * dx)
+        psi = np.fft.fft(psi)
+    return radius
+
+def Uquench_time_ev(U_0 = 1, U_max = 2):
+    x, psi0 = imaginary_time_ev_2nd(U = U_0)
+    ts = np.linspace(-1,199,int(1e6))
+    Us = np.minimum(U_max*np.ones_like(ts), U_max+(U_max-U_0)*ts)
+    radius = time_ev_4th(x, psi0, ts, Us)
+    np.save('radiusU20.npy',radius)
+    plt.plot(ts, radius)
+    plt.xlabel('t')
+    plt.ylabel('width')
+    plt.title(f'Width time evolution after initial U ramp from {U_0} to {U_max}')
+    plt.show()
+
+def plot_fft():
+    radius = np.load('radiusU2.npy')[10000:]
+    radius = radius - np.mean(radius)
+    radius_fft = np.abs(np.fft.fft(radius))
+    omega = 2 * np.pi * np.fft.fftfreq(len(radius), 100/1e6)
+    plot_range = (omega>0) & (omega<4)
+    omega_max = omega[np.argmax(radius_fft[plot_range])+1]
+    plt.axvline(omega_max)
+    plt.scatter(omega[plot_range],radius_fft[plot_range], s=1)
+    plt.xlabel(r'$\omega$')
+    plt.yscale('log')
+    plt.title(r'FFT of GPE radius dynamics after U quench from 1 to 20, $\omega_{max}$ =' f' {omega_max:.2f}')
+    plt.show()
+
 # U = 25
 # x, psi = imaginary_time_ev_2nd(U = U)
 # psisq_x_plot(x, psi, U)
 # radius_U_plot()
-energy_U_plot()
+# energy_U_plot()
+# Uquench_time_ev()
+plot_fft()
