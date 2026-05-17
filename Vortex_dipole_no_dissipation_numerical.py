@@ -45,7 +45,7 @@ def itime_ev_2nd_vortex_dipole(x_max=6, y_max=6, tau_max = 2, dtau = 0.001, dx=0
     psi = cp.fft.ifft2(psi)
     psi = cp.abs(psi) * vortex_phase
     psi /= cp.sqrt(cp.sum(cp.abs(psi)**2*dx*dy))
-    np.savez(f'vortex_dipole_numerical_saves/g{g}_d{x1_0:.1f}_init', x2d=x2d, y2d=y2d, psi=psi)
+    np.savez(f'numerical_saves/Vortex_dipole/g{g}_d{x1_0:.1f}_init', x2d=x2d, y2d=y2d, psi=psi)
     return cp.asnumpy(x2d), cp.asnumpy(y2d), cp.asnumpy(psi)
 
 def psi_time_ev_4th(x2d, y2d, psi0, t, g):
@@ -93,19 +93,19 @@ def psi_time_ev_4th(x2d, y2d, psi0, t, g):
     return cp.asnumpy(t), cp.asnumpy(psi)
 
 def plot_groundstate_density(g, x1_0):
-    data = np.load(f'vortex_dipole_numerical_saves/g{g}_d{x1_0:.1f}_init.npz')
+    data = np.load(f'numerical_saves/Vortex_dipole/g{g}_d{x1_0:.1f}_init.npz')
     plt.imshow(np.abs(data['psi'])**2)
     plt.show()
 
 def psi_time_ev_from_groundstate(g, x1_0):
-    groundstate_data = np.load(f'vortex_dipole_numerical_saves/g{g}_d{x1_0:.1f}_init.npz')
+    groundstate_data = np.load(f'numerical_saves/Vortex_dipole/g{g}_d{x1_0:.1f}_init.npz')
     x2d, y2d, psi0 = groundstate_data['x2d'], groundstate_data['y2d'], groundstate_data['psi']
     t = np.linspace(0, 20, 100000)
     t, psi = psi_time_ev_4th(x2d, y2d, psi0, t, g)
-    np.savez(f'vortex_dipole_numerical_saves/g{g}_d{x1_0:.1f}_time_ev.npz', t=t, psi=psi)
+    np.savez(f'numerical_saves/Vortex_dipole/g{g}_d{x1_0:.1f}_time_ev.npz', t=t, psi=psi)
 
 def make_animation(g, x1_0):
-    time_ev_data = np.load(f'vortex_dipole_numerical_saves/g{g}_d{x1_0:.1f}_time_ev.npz')
+    time_ev_data = np.load(f'numerical_saves/Vortex_dipole/g{g}_d{x1_0:.1f}_time_ev.npz')
     t, psi = time_ev_data['t'], time_ev_data['psi']
     psi_sq = np.abs(psi)**2
     fig, ax = plt.subplots()
@@ -116,13 +116,13 @@ def make_animation(g, x1_0):
         return [image]
 
     ani = animation.FuncAnimation(fig=fig, func=update, frames=psi.shape[0], interval=20, blit=True)
-    ani.save(f'vortex_dipole_numerical_saves/g{g}_d{x1_0:.1f}_animation.mp4')
+    ani.save(f'numerical_saves/Vortex_dipole/g{g}_d{x1_0:.1f}_animation.mp4')
 
 def angle_diff(a, b):
     return (a-b+np.pi) % (2*np.pi) - np.pi
 
 def find_vortex(g, x1_0, amp_threshold=0.01):
-    psi = np.load(f'vortex_dipole_numerical_saves/g{g}_d{x1_0:.1f}_time_ev.npz')['psi']
+    psi = np.load(f'numerical_saves/Vortex_dipole/g{g}_d{x1_0:.1f}_time_ev.npz')['psi']
     psi_angle = np.angle(psi)
     dl = angle_diff(psi_angle[:, :, :-1], psi_angle[:, :, 1:])
     du = angle_diff(psi_angle[:, :-1, :], psi_angle[:, 1:, :])
@@ -135,11 +135,11 @@ def find_vortex(g, x1_0, amp_threshold=0.01):
     vortex_number = np.round(total_phase/(2*np.pi))
     cw_vortex_map = (vortex_number == 1) & density_mask
     ccw_vortex_map = (vortex_number == -1) & density_mask
-    np.savez(f'vortex_dipole_numerical_saves/g{g}_d{x1_0:.1f}_vortex_maps', cw_vortex_map=cw_vortex_map, ccw_vortex_map=ccw_vortex_map)
+    np.savez(f'numerical_saves/Vortex_dipole/g{g}_d{x1_0:.1f}_vortex_maps', cw_vortex_map=cw_vortex_map, ccw_vortex_map=ccw_vortex_map)
     return cw_vortex_map, ccw_vortex_map
 
 def plot_vortex_trajectory(g, x1_0):
-    data = np.load(f'vortex_dipole_numerical_saves/g{g}_d{x1_0:.1f}_vortex_maps.npz')
+    data = np.load(f'numerical_saves/Vortex_dipole/g{g}_d{x1_0:.1f}_vortex_maps.npz')
     cw_vortex_map, ccw_vortex_map = data['cw_vortex_map'], data['ccw_vortex_map']
     cw_vortex_idx = cw_vortex_map.nonzero()
     ccw_vortex_idx = ccw_vortex_map.nonzero()
@@ -163,7 +163,7 @@ def plot_vortex_trajectories_g150():
     axes[1][1].set_xlabel('x')
     axes = axes.flatten()
     for idx, x1_0 in enumerate([0.8, 1.1, 1.3, 1.5]):
-        data = np.load(f'vortex_dipole_numerical_saves/g150_d{x1_0:.1f}_vortex_maps.npz')
+        data = np.load(f'numerical_saves/Vortex_dipole/g150_d{x1_0:.1f}_vortex_maps.npz')
         cw_vortex_map, ccw_vortex_map = data['cw_vortex_map'], data['ccw_vortex_map']
         cw_vortex_idx = cw_vortex_map.nonzero()
         ccw_vortex_idx = ccw_vortex_map.nonzero()
@@ -182,7 +182,7 @@ def plot_vortex_trajectories_low_g():
     axes[1].set_xlabel('x')
     axes = axes.flatten()
     for idx, g in enumerate([10, 50]):
-        data = np.load(f'vortex_dipole_numerical_saves/g{g}_d0.8_vortex_maps.npz')
+        data = np.load(f'numerical_saves/Vortex_dipole/g{g}_d0.8_vortex_maps.npz')
         cw_vortex_map, ccw_vortex_map = data['cw_vortex_map'], data['ccw_vortex_map']
         cw_vortex_idx = cw_vortex_map.nonzero()
         ccw_vortex_idx = ccw_vortex_map.nonzero()
