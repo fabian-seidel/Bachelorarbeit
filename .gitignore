@@ -2,3 +2,4 @@ test.py
 .venv/
 .idea/
 *.npy
+*.npz

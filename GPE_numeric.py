@@ -53,7 +53,7 @@ def imaginary_time_ev_4th(U = 10, x_max = 8, tau_max = 10, dtau = 0.0001, dx= 0.
 
 def imaginary_time_ev_2nd(U = 25, x_max = 8, tau_max = 10, dtau = 0.001, dx= 0.025):
     num_x = int(2 * x_max / dx)
-    x = np.linspace(-x_max, x_max, num_x, endpoint=False)
+    x, num_x = np.linspace(-x_max, x_max, num_x, endpoint=False, retstep=True)
     k_sq = (2 * np.pi * np.fft.fftfreq(num_x, d=dx)) ** 2
     pot = x ** 2 / 2
     psi = np.ones(num_x) / num_x
