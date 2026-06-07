@@ -3,3 +3,4 @@ test.py
 .idea/
 *.npy
 *.npz
+*.dill

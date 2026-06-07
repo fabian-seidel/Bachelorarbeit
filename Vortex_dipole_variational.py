@@ -121,7 +121,6 @@ def integrate_complex_disc(integrand, z, zs, mu):
 
     return total_integral
 
-
 def derive_lagrangian_thomasfermi():
     g, mu = sp.symbols('g mu', real=True)
     z1, z2, z1s, z2s = sp.symbols('z1 z2 z1s z2s')
@@ -137,16 +136,13 @@ def derive_lagrangian_thomasfermi():
 
     dv_dz = zs - z2s
     dv_dzs = z - z1
-    dvs_dz = zs - z1s
-    dvs_dzs = z - z2
-    grad_v_sq = 2 * (dv_dzs * dvs_dz + dv_dz * dvs_dzs)
 
-    L1_integrand = (sp.I / 2) * (vs * v_dot - v * vs_dot) * f2
-    L2_1_integrand = - f2 * grad_v_sq / 2
+    R1_integrand = (sp.I / 2) * (vs * v_dot - v * vs_dot) * f2
+    L2_1_integrand = 2 * f2 * vs + vs * (sp.diff(f2, z) * dv_dzs + sp.diff(f2, zs) * dv_dz)
     L2_2_integrand = - (z * zs) * (v * vs) * f2 / 2
     L2_3_integrand = - g * (v * vs) ** 2 * f2 ** 2 / 2
 
-    L1_int = integrate_complex_disc(L1_integrand, z, zs, mu)
+    L1_int = integrate_complex_disc(R1_integrand, z, zs, mu)
     L2_1_int = integrate_complex_disc(L2_1_integrand, z, zs, mu)
     L2_2_int = integrate_complex_disc(L2_2_integrand, z, zs, mu)
     L2_3_int = integrate_complex_disc(L2_3_integrand, z, zs, mu)
@@ -281,42 +277,6 @@ def load_R_gaussian():
     with open("numerical_saves/Vortex_dipole/dissipation_func_gaussian.dill", "rb") as f:
         R = dill.load(f)
     return R
-
-def derive_lagrangian_thomasfermi():
-    g, mu = sp.symbols('g mu', real=True)
-    z1, z2, z1s, z2s = sp.symbols('z1 z2 z1s z2s')
-    z1_dot, z2_dot, z1s_dot, z2s_dot = sp.symbols('z1_dot z2_dot z1s_dot z2s_dot')
-    z, zs = sp.symbols('z zs')
-
-    f2 = (mu - z * zs / 2) / g
-    v = (z - z1) * (zs - z2s)
-    vs = (zs - z1s) * (z - z2)
-
-    v_dot = -z1_dot * (zs - z2s) - z2s_dot * (z - z1)
-    vs_dot = -z1s_dot * (z - z2) - z2_dot * (zs - z1s)
-
-    dv_dz = zs - z2s
-    dv_dzs = z - z1
-
-    R1_integrand = (sp.I / 2) * (vs * v_dot - v * vs_dot) * f2
-    L2_1_integrand = 2 * f2 * vs + vs * (sp.diff(f2, z) * dv_dzs + sp.diff(f2, zs) * dv_dz)
-    L2_2_integrand = - (z * zs) * (v * vs) * f2 / 2
-    L2_3_integrand = - g * (v * vs) ** 2 * f2 ** 2 / 2
-
-    L1_int = integrate_complex_disc(R1_integrand, z, zs, mu)
-    L2_1_int = integrate_complex_disc(L2_1_integrand, z, zs, mu)
-    L2_2_int = integrate_complex_disc(L2_2_integrand, z, zs, mu)
-    L2_3_int = integrate_complex_disc(L2_3_integrand, z, zs, mu)
-
-    A2 = 3 / (2 * mu ** 2 + 2 * mu * (z1 + z2) * (z1s + z2s) + 3 * z1 * z1s * z2 * z2s)
-    L = A2 * (L1_int + L2_1_int + L2_2_int) + (A2 ** 2) * L2_3_int
-
-    L = L.subs(mu, sp.sqrt(g / sp.pi))
-
-    with open("numerical_saves/Vortex_dipole/lagrangian_thomasfermi.dill", "wb") as f:
-        dill.dump(L, f)
-
-    return L
 
 def get_EL_SOE_matrix(L, R = None, gamma_val=0.1):
     g = sp.symbols('g', real=True)
