@@ -5,7 +5,6 @@ from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 from plot_utils import plot_by_name
 import dill
-import time
 
 def get_lagrangian_gaussian():
     g = sp.symbols('g', real=True)
