@@ -215,6 +215,56 @@ def load_R_gaussian():
         R = dill.load(f)
     return R
 
+def derive_R_thomasfermi():
+    g, mu = sp.symbols('g mu', real=True)
+    gamma = sp.symbols('gamma', real=True)
+    z1, z2, z1s, z2s = sp.symbols('z1 z2 z1s z2s')
+    z1_dot, z2_dot, z1s_dot, z2s_dot = sp.symbols('z1_dot z2_dot z1s_dot z2s_dot')
+    z, zs = sp.symbols('z zs')
+
+    f2 = (mu - z * zs / 2) / g
+    v = (z - z1) * (zs - z2s)
+    vs = (zs - z1s) * (z - z2)
+
+    v_dot = -z1_dot * (zs - z2s) - z2s_dot * (z - z1)
+    vs_dot = -z1s_dot * (z - z2) - z2_dot * (zs - z1s)
+
+    dv_dz = zs - z2s
+    dv_dzs = z - z1
+    dvs_dz = zs - z1s
+    dvs_dzs = z - z2
+
+    R1_integrand = -2 * f2 * v_dot - v_dot * (sp.diff(f2, z) * dvs_dzs + sp.diff(f2, zs) * dvs_dz)
+    R1_cc_integrand = -2 * f2 * vs_dot - vs_dot * (sp.diff(f2, z) * dv_dzs + sp.diff(f2, zs) * dv_dz)
+    R2_integrand = (z * zs) * (v_dot * vs) * f2 / 2
+    R2_cc_integrand = (z * zs) * (vs_dot * v) * f2 / 2
+    R3_integrand = g * v_dot * v * vs**2 * f2 ** 2
+    R3_cc_integrand = g * vs_dot * v**2 * vs * f2 ** 2
+
+    R1_int = integrate_complex_disc(R1_integrand, z, zs, mu)
+    R1_cc_int = integrate_complex_disc(R1_cc_integrand, z, zs, mu)
+    R2_int = integrate_complex_disc(R2_integrand, z, zs, mu)
+    R2_cc_int = integrate_complex_disc(R2_cc_integrand, z, zs, mu)
+    R3_int = integrate_complex_disc(R3_integrand, z, zs, mu)
+    R3_cc_int = integrate_complex_disc(R3_cc_integrand, z, zs, mu)
+
+
+    A2 = 3 / (2 * mu ** 2 + 2 * mu * (z1 + z2) * (z1s + z2s) + 3 * z1 * z1s * z2 * z2s)
+    R = A2 * (R1_int - R1_cc_int + R2_int - R2_cc_int) + (A2 ** 2) * (R3_int - R3_cc_int)
+    R *= sp.I * gamma
+
+    R = R.subs(mu, sp.sqrt(g / sp.pi))
+
+    with open("numerical_saves/Vortex_dipole/dissipation_func_thomasfermi.dill", "wb") as f:
+        dill.dump(R, f)
+
+    return R
+
+def load_R_thomasfermi():
+    with open("numerical_saves/Vortex_dipole/dissipation_func_thomasfermi.dill", "rb") as f:
+        R = dill.load(f)
+    return R
+
 def get_EL_SOE_matrix(L, R = None, gamma_val=0.1):
     g = sp.symbols('g', real=True)
     z1, z2, z1s, z2s = sp.symbols('z1 z2 z1s z2s')
@@ -317,12 +367,15 @@ if __name__ == '__main__':
     L_gaussian = load_lagrangian_gaussian()
     L_thomasfermi = load_lagrangian_thomasfermi()
     R_gaussian = load_R_gaussian()
+    R_thomasfermi = derive_R_thomasfermi()
     M_gaussian, F_gaussian = get_EL_SOE_matrix(L_gaussian)
     M_gaussian_diss, F_gaussian_diss = get_EL_SOE_matrix(L_gaussian, R=R_gaussian, gamma_val=0.1)
     M_thomasfermi, F_thomasfermi = get_EL_SOE_matrix(L_thomasfermi)
+    M_thomasfermi_diss, F_thomasfermi_diss = get_EL_SOE_matrix(L_thomasfermi, R=R_thomasfermi, gamma_val=0.1)
 
     plot_dict = {'Vortex-Antivortex Trajectories for Gaussian ansatz': (plot_vortex_antivortex_trajectories, {'M_func':M_gaussian, 'F_func':F_gaussian}),
                  'Vortex-Antivortex Trajectories for Thomas-Fermi ansatz': (plot_vortex_antivortex_trajectories, {'M_func':M_thomasfermi, 'F_func':F_thomasfermi}),
-                 'Vortex-Antivortex Trajectories for Gaussian ansatz with dissipation': (plot_vortex_antivortex_trajectories, {'M_func':M_gaussian_diss, 'F_func':F_gaussian_diss})}
-    plot_by_name(plot_dict, 'Vortex-Antivortex Trajectories for Gaussian ansatz with dissipation')
+                 'Vortex-Antivortex Trajectories for Gaussian ansatz with dissipation': (plot_vortex_antivortex_trajectories, {'M_func':M_gaussian_diss, 'F_func':F_gaussian_diss}),
+                 'Vortex-Antivortex Trajectories for Thomas-Fermi ansatz with dissipation': (plot_vortex_antivortex_trajectories, {'M_func': M_thomasfermi_diss, 'F_func': F_thomasfermi_diss})}
+    plot_by_name(plot_dict, 'Vortex-Antivortex Trajectories for Thomas-Fermi ansatz with dissipation')
     # plot_vortex_antivortex_trajectory(M_func_gaussian, F_func_gaussian_diss)
