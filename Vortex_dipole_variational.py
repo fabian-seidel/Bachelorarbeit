@@ -157,69 +157,6 @@ def derive_lagrangian_thomasfermi():
 
     return L
 
-def derive_lagrangian_thomasfermi_slow():
-    g, mu = sp.symbols('g mu', real=True)
-    mu_val = sp.sqrt(g / sp.pi)
-
-    z1, z2, z1s, z2s = sp.symbols('z1 z2 z1s z2s')
-    z1_dot, z2_dot, z1s_dot, z2s_dot = sp.symbols('z1_dot z2_dot z1s_dot z2s_dot')
-
-    r, phi = sp.symbols('r phi', real=True, positive=True)
-    z, zs = sp.symbols('z zs')
-
-    A2 = 3 / (2 * mu ** 2 + 2 * mu * (z1 + z2) * (z1s + z2s) + 3 * z1 * z1s * z2 * z2s)
-
-    f2 = (mu - z*zs / 2) / g
-
-    v = (z - z1) * (zs - z2s)
-    vs = (zs - z1s) * (z - z2)
-
-    v_dot = -(z1_dot * (zs - z2s) + z2s_dot * (z - z1))
-    v_dot_star = -(z1s_dot * (z - z2) + z2_dot * (zs - z1s))
-
-    polar_subs = {z: r * sp.exp(sp.I * phi), zs: r * sp.exp(- sp.I * phi)}
-
-    print("Beginning calculation of L1")
-    L1_integrand = sp.expand((vs * v_dot * f2).subs(polar_subs))
-    L1_int = sp.integrate(L1_integrand * r, (r, 0, sp.sqrt(2 * mu)), (phi, 0, 2 * sp.pi))
-    L1_part = sp.I / 2 * A2 * L1_int
-
-    L1_cc_integrand = sp.expand((v * v_dot_star * f2).subs(polar_subs))
-    L1_cc_int = sp.integrate(L1_cc_integrand * r, (r, 0, sp.sqrt(2 * mu)), (phi, 0, 2 * sp.pi))
-    L1_cc = - sp.I / 2 * A2 * L1_cc_int
-
-    L1 = L1_part + L1_cc
-
-    print("Beginning calculation of L2, t1")
-    # v* f (2 \nabla v \nabla f + f \Delta v) = v* (\nabla v \nabla(f^2) + f^2 \Delta v)
-    t1_integrand = sp.expand((vs*(4*f2+2*sp.diff(f2,z)*sp.diff(v,zs)+2*sp.diff(f2,zs)*sp.diff(v,z))).subs(polar_subs))
-    t1_int = sp.integrate(t1_integrand * r, (r, 0, sp.sqrt(2 * mu)), (phi, 0, 2 * sp.pi))
-
-    print("Beginning calculation of L2, t2")
-    # (x^2+y^2) |u|^2 = (x^2+y^2) * vs * v * f^2
-    t2_integrand = sp.expand((z * zs * vs * v * f2).subs(polar_subs))
-    t2_int = sp.integrate(t2_integrand * r, (r, 0, sp.sqrt(2 * mu)), (phi, 0, 2 * sp.pi))
-
-    print("Beginning calculation of L2, t3")
-    # |u|^4 = (vs * v)^2 * (f^2)^2
-    t3_integrand = sp.expand(((vs * v) ** 2 * f2 ** 2).subs(polar_subs))
-    t3_int = sp.integrate(t3_integrand * r, (r, 0, sp.sqrt(2 * mu)), (phi, 0, 2 * sp.pi))
-
-    L2 = 1 / 2 * (A2 * t1_int - A2 * t2_int - g * A2 ** 2 * t3_int)
-
-    L = L1 + L2
-
-    L = L.subs(mu, mu_val)
-
-    # print("Finished L calculation, starting simplification")
-    # L = sp.simplify(L)
-    # print("Finished L simplification")
-
-    with open("numerical_saves/Vortex_dipole/lagrangian_thomasfermi.dill", "wb") as f:
-        dill.dump(L, f)
-
-    return L
-
 def load_lagrangian_thomasfermi():
     with open("numerical_saves/Vortex_dipole/lagrangian_thomasfermi.dill", "rb") as f:
         L = dill.load(f)
