@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 
-def itime_ev_2nd_2D(g, tau_max=2, dtau=0.001, x_max=6, dx=0.025, y_max=6, dy=0.025, N0=1, paths=None):
+def itime_ev_2nd_2D(g, tau_max=10, dtau=0.001, x_max=10, dx=0.025, y_max=10, dy=0.025, N0=1, paths=None):
     paths = paths or {}
     num_x = int(2 * x_max / dx)
     num_y = int(2 * y_max / dy)
@@ -16,28 +16,32 @@ def itime_ev_2nd_2D(g, tau_max=2, dtau=0.001, x_max=6, dx=0.025, y_max=6, dy=0.0
     k_x2d, k_y2d = cp.meshgrid(k_x, k_y)
     k_sq = k_x2d ** 2 + k_y2d ** 2
     pot = 1 / 2 * (x2d ** 2 + y2d ** 2)
-    psi = cp.ones((num_y, num_x))
+    sigma_gaussian = (1 + g * N0 / (2 * cp.pi)) ** (1 / 4)
+    psi = cp.sqrt(N0/cp.pi)/sigma_gaussian * cp.exp(-(x2d**2 + y2d**2)/(2*sigma_gaussian**2))
     psi = cp.fft.fft2(psi)
     psi = cp.exp(-dtau * k_sq / 4) * psi
     tau = 0
     while tau < tau_max:
         psi = cp.fft.ifft2(psi)
-        Mb = cp.exp(dtau * (-pot - g * cp.abs(psi) ** 2))
+        if (int(round(tau / dtau)) % 50) == 0:
+            print(f"Imaginary time evolution (no vortex): {tau:.3f} of {tau_max}")
+        if (int(round(tau / dtau)) % 3000) == 0:
+            print(calculate_mu(g, x2d=cp.asnumpy(x2d), y2d=cp.asnumpy(y2d), psi=cp.asnumpy(psi)))
+        Mb = cp.exp(dtau * (-pot - g * (psi.real**2 + psi.imag**2)))
         psi *= Mb
-        psi /= cp.sqrt(N0*cp.sum(cp.abs(psi) ** 2 * dx * dy))
+        psi /= cp.sqrt(cp.sum((psi.real**2 + psi.imag**2)/N0 * dx * dy))
         psi = cp.fft.fft2(psi)
         psi *= cp.exp(-dtau * k_sq / 2)
         tau += dtau
-        if (int(round(tau / dtau)) % 50) == 0:
-            print(f"Imaginary time evolution (no vortex): {tau:.3f} of {tau_max}")
+
     psi = cp.fft.ifft2(psi)
-    Mb = cp.exp(dtau * (-pot - g * cp.abs(psi) ** 2))
+    Mb = cp.exp(dtau * (-pot - g * (psi.real**2 + psi.imag**2)))
     psi *= Mb
-    psi /= cp.sqrt(N0*cp.sum(cp.abs(psi) ** 2 * dx * dy))
+    psi /= cp.sqrt(cp.sum((psi.real**2 + psi.imag**2)/N0 * dx * dy))
     psi = cp.fft.fft2(psi)
     psi *= cp.exp(-dtau * k_sq / 4)
     psi = cp.fft.ifft2(psi)
-    psi /= cp.sqrt(N0*cp.sum(cp.abs(psi) ** 2 * dx * dy))
+    psi /= cp.sqrt(cp.sum((psi.real**2 + psi.imag**2)/N0 * dx * dy))
     if 'savepath' in paths:
         np.savez(paths['savepath'], x2d=cp.asnumpy(x2d), y2d=cp.asnumpy(y2d), psi=cp.asnumpy(psi))
     return cp.asnumpy(x2d), cp.asnumpy(y2d), cp.asnumpy(psi)
@@ -80,13 +84,13 @@ def psi_time_ev_4th_2D(g, gamma=0, mu=0, t_max=20, dt=0.001, x2d=None, y2d=None,
         if idx % save_step == 0:
             psi_i = cp.fft.ifft2(psi_i)
             psi[int(idx / save_step)] = psi_i
-            current_norm = cp.sum(cp.abs(psi_i) ** 2) * dx * dy
+            current_norm = cp.sum(psi_i.real**2 + psi_i.imag**2) * dx * dy
             psi_i = cp.fft.fft2(psi_i)
             print(f"Time evolution: {t[idx]:.3f} of {t[-1]:.3f}, current norm: {current_norm}.")
         for factor_num in range(3, 0, -1):
             psi_i *= Ma[factor_num]
             psi_i = cp.fft.ifft2(psi_i)
-            psi_i *= cp.exp(b[factor_num - 1] * 1j * dt * (1 - gamma * 1j) * (-pot - g * cp.abs(psi_i) ** 2 + mu))
+            psi_i *= cp.exp(b[factor_num - 1] * 1j * dt * (1 - gamma * 1j) * (-pot - g * (psi_i.real**2 + psi_i.imag**2) + mu))
             psi_i = cp.fft.fft2(psi_i)
         psi_i *= Ma[0]
     t_np, x2d_np, y2d_np, psi_np = cp.asnumpy(t[::save_step]), cp.asnumpy(x2d), cp.asnumpy(y2d), cp.asnumpy(psi)
@@ -131,14 +135,14 @@ def psi_time_ev_2nd_2D(g, gamma=0, mu=0, t=None, t_max=20, dt=1e-3, x2d=None, y2
     for idx in range(len(t)):
         if idx % save_step == 0:
             psi[int(idx / save_step)] = psi_i
-            current_norm = cp.sum(cp.abs(psi_i) ** 2) * dx * dy
+            current_norm = cp.sum((psi_i.real**2 + psi_i.imag**2)) * dx * dy
             print(f"Time evolution: {t[idx]:.3f} of {t[-1]:.3f}, current Norm: {current_norm}")
-        psi_i *= cp.exp(-1j * (dt / 2) * (1 - gamma * 1j) * (pot - mu + g * cp.abs(psi_i) ** 2))
+        psi_i *= cp.exp(-1j * (dt / 2) * (1 - gamma * 1j) * (pot - mu + g * (psi_i.real**2 + psi_i.imag**2)))
         psi_i = cp.fft.fft2(psi_i)
         psi_i *= Ma
         # psi_i *= mask
         psi_i = cp.fft.ifft2(psi_i)
-        psi_i *= cp.exp(-1j * (dt / 2) * (1 - gamma * 1j) * (pot - mu + g * cp.abs(psi_i) ** 2))
+        psi_i *= cp.exp(-1j * (dt / 2) * (1 - gamma * 1j) * (pot - mu + g * (psi_i.real**2 + psi_i.imag**2)))
     t_np, x2d_np, y2d_np, psi_np = cp.asnumpy(t[::save_step]), cp.asnumpy(x2d), cp.asnumpy(y2d), cp.asnumpy(psi)
     if 'savepath' in paths:
         np.savez(paths['savepath'], t=t_np, x2d=x2d_np, y2d=y2d_np, psi=psi_np)
@@ -192,14 +196,19 @@ def calculate_mu(g, x2d=None, y2d=None, psi=None, paths=None):
     k_y = 2 * np.pi * np.fft.fftfreq(num_y, d=dy)
     k_x2d, k_y2d = np.meshgrid(k_x, k_y)
     k_sq = k_x2d ** 2 + k_y2d ** 2
-    N = np.sum(np.abs(psi) ** 2) * dx * dy
-    mu_spacial = np.sum(np.abs(psi) ** 2 * pot + g * np.abs(psi) ** 4) * dx * dy
+    N = np.sum(psi.real**2 + psi.imag**2) * dx * dy
+    mu_spacial = np.sum((psi.real**2 + psi.imag**2) * pot + g * (psi.real**2 + psi.imag**2)**2) * dx * dy
     psi_fft = np.fft.fft2(psi)
-    mu_kin = np.sum(1 / 2 * k_sq * np.abs(psi_fft) ** 2) * dx * dy / (num_x * num_y)
+    mu_kin = np.sum(1 / 2 * k_sq * (psi_fft.real**2 + psi_fft.imag**2)) * dx * dy / (num_x * num_y)
     mu = (mu_spacial + mu_kin) / N
     if 'savepath' in paths:
         np.save(paths['savepath'], mu)
     return mu
+
+def calculate_RMS_width(x2d, y2d, psi):
+    psi_abs_sq = (psi.real**2 + psi.imag**2)
+    psi_abs_sq /= np.sum(psi_abs_sq, axis=(1,2), keepdims=True)
+    return np.sqrt(np.sum(psi_abs_sq * (x2d**2 + y2d**2), axis=(1,2)))
 
 def plot_density(x2d=None, y2d=None, psi=None, paths=None):
     paths = paths or {}
@@ -210,7 +219,7 @@ def plot_density(x2d=None, y2d=None, psi=None, paths=None):
         psi = data['psi'] if psi is None else psi
     if any(v is None for v in (x2d, y2d, psi)):
         raise ValueError("Missing required arguments: x2d, y2d, or psi.")
-    plt.imshow(np.abs(psi) ** 2, extent=[np.min(y2d), np.max(y2d), np.min(x2d), np.max(x2d)])
+    plt.imshow((psi.real**2 + psi.imag**2), extent=[np.min(y2d), np.max(y2d), np.min(x2d), np.max(x2d)])
     plt.show()
 
 def make_animation(x2d=None, y2d=None, psi=None, paths=None):
@@ -221,7 +230,7 @@ def make_animation(x2d=None, y2d=None, psi=None, paths=None):
         x2d = data['x2d'] if x2d is None else x2d
         y2d = data['y2d'] if y2d is None else y2d
         psi = data['psi'] if psi is None else psi
-    psi_sq = np.abs(psi) ** 2
+    psi_sq = (psi.real**2 + psi.imag**2)
     fig, ax = plt.subplots()
     image = ax.imshow(psi_sq[0], interpolation='none', extent=[np.min(y2d), np.max(y2d), np.min(x2d), np.max(x2d)],
                       animated=True)
@@ -232,3 +241,4 @@ def make_animation(x2d=None, y2d=None, psi=None, paths=None):
     if 'savepath' in paths:
         ani.save(paths['savepath'])
     return ani
+

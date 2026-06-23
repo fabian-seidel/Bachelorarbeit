@@ -3,7 +3,7 @@ import numpy as np
 from sympy.utilities.lambdify import lambdify
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
-from plot_utils import plot_by_name
+from utils import plot_by_name
 import dill
 
 def derive_L_vd_gaussian():
@@ -336,9 +336,9 @@ if __name__ == '__main__':
     # R_gaussian = load_R_vd_gaussian()
     R_thomasfermi = load_R_vd_thomasfermi()
     # M_gaussian, F_gaussian = get_EL_SOE_matrix(L_gaussian)
-    gamma = 0.01
+    gamma = 0.03
     # M_gaussian_diss, F_gaussian_diss = get_EL_SOE_matrix(L_gaussian, R=R_gaussian, gamma_val=gamma)
-    M_thomasfermi, F_thomasfermi = get_EL_SOE_matrix(L_thomasfermi)
+    # M_thomasfermi, F_thomasfermi = get_EL_SOE_matrix(L_thomasfermi)
     M_thomasfermi_diss, F_thomasfermi_diss = get_EL_SOE_matrix(L_thomasfermi, R=R_thomasfermi, gamma_val=gamma)
 
     # plot_dict = {'Vortex-Antivortex Trajectories for Gaussian ansatz': (plot_vortex_antivortex_trajectories, {'M_func':M_gaussian, 'F_func':F_gaussian}),
@@ -346,7 +346,7 @@ if __name__ == '__main__':
     #              'Vortex-Antivortex Trajectories for Gaussian ansatz with dissipation': (plot_vortex_antivortex_trajectories, {'M_func':M_gaussian_diss, 'F_func':F_gaussian_diss}),
     #              'Vortex-Antivortex Trajectories for Thomas-Fermi ansatz with dissipation': (plot_vortex_antivortex_trajectories, {'M_func': M_thomasfermi_diss, 'F_func': F_thomasfermi_diss})}
     # plot_by_name(plot_dict, 'Vortex-Antivortex Trajectories for Gaussian ansatz with dissipation')
-    g = 2000
+    g = 500
     x1_0 = 1.3
     T = 10
     rtol = 1e-8

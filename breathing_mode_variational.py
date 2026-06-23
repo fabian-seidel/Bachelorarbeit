@@ -2,6 +2,7 @@ import sympy as sp
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
+from utils import execute_for_param_cases
 
 def derive_L_gaussian():
     r, t, mu, g = sp.symbols('r t mu g', real=True, positive=True)
@@ -125,43 +126,75 @@ def dparameters_dt_thomasfermi(t, N0rhobeta, g, mu, gamma):
     beta_dot = 2*g*N0/(np.pi*rho**4) - 2*beta**2 - 1/2
     return [N0_dot, rho_dot, beta_dot]
 
+def gaussian_time_ev_from_groundstate(t_max=30, dt=1e-2, g_before=0.0103, g=0.01, N0_eq=1000, gamma=0.04, paths=None):
+    paths = paths or {}
+    t_eval = np.linspace(0, t_max, int(t_max/dt))
+    sigma_gs = (1 + g * N0_eq / (2 * np.pi)) ** (1 / 4)
+    sigma_0 = (1 + g_before * N0_eq / (2 * np.pi)) ** (1 / 4)
+    params_init = [N0_eq, sigma_0, 0]
+    mu = 1 / (2 * sigma_gs ** 2) + sigma_gs ** 2 / 2 + (g * N0_eq) / (2 * np.pi * sigma_gs ** 2)
+    sol = scipy.integrate.solve_ivp(dparameters_dt_gaussian, (0, t_max), params_init, args=(g, mu, gamma), t_eval=t_eval)
+    t = sol.t
+    N0 = sol.y[0,:]
+    width = sol.y[1,:]
+    if 'solution_savepath' in paths:
+        np.savez(paths['solution_savepath'], t=t, N0=N0, width=width)
+    return t, N0, width
 
-def radius_t_plot_variational(t_num=1000, T=30, g_before=0.0103, g=0.01, N0_eq=1000, gamma=0.04, ansatz='gaussian'):
-    t_eval = np.linspace(0, T, t_num)
+def thomasfermi_time_ev_from_groundstate(t_max=30, dt=1e-2, g_before=0.0103, g=0.01, N0_eq=1000, gamma=0.04, paths=None):
+    paths = paths or {}
+    t_eval = np.linspace(0, t_max, int(t_max/dt))
+    rho_gs = (4 * g * N0_eq / np.pi) ** (1 / 4)
+    rho_0 = (4 * g_before * N0_eq / np.pi) ** (1 / 4)
+    params_init = [N0_eq, rho_0, 0]
+    mu = rho_gs**2/6 + 4 * g * N0_eq / (3 * np.pi * rho_gs**2)
+    sol = scipy.integrate.solve_ivp(dparameters_dt_thomasfermi, (0, t_max), params_init, args=(g, mu, gamma), t_eval=t_eval)
+    t = sol.t
+    N0 = sol.y[0,:]
+    width = sol.y[1,:]/np.sqrt(3)
+    if 'solution_savepath' in paths:
+        np.savez(paths['solution_savepath'], t=t, N0=N0, width=width)
+    return t, N0, width
 
-    if ansatz=='gaussian':
-        sigma_gs = (1 + g * N0_eq / (2 * np.pi)) ** (1 / 4)
-        sigma_0 = (1 + g_before * N0_eq / (2 * np.pi)) ** (1 / 4)
-        params_init = [N0_eq, sigma_0, 0]
-        mu = 1 / (2 * sigma_gs ** 2) + sigma_gs ** 2 / 2 + (g * N0_eq) / (2 * np.pi * sigma_gs ** 2)
-        diff_function = dparameters_dt_gaussian
-    elif ansatz=='thomas-fermi':
-        rho_gs = (4 * g * N0_eq / np.pi) ** (1 / 4)
-        rho_0 = (4 * g_before * N0_eq / np.pi) ** (1 / 4)
-        params_init = [N0_eq, rho_0, 0]
-        mu = rho_gs**2/6 + 4 * g * N0_eq / (3 * np.pi * rho_gs**2)
-        diff_function = dparameters_dt_thomasfermi
-    else:
-        print("Only ansatz='gaussian' or 'thomas-fermi' possible")
-
-    sol = scipy.integrate.solve_ivp(diff_function, (0, T), params_init, args=(g, mu, gamma), t_eval=t_eval)
-    N0 = sol.y[0]
-    if ansatz=='gaussian':
-        width = sol.y[1]
-    elif ansatz=='thomas-fermi':
-        width = sol.y[1] / np.sqrt(3)
-
-    fig, ax1 = plt.subplots()
-    ax1.plot(t_eval, width, label='width')
-    ax1.set_xlabel('t')
-    ax1.set_ylabel('width')
-    ax2 = ax1.twinx()
-    ax2.set_ylabel(r'$N_0$')
-    ax2.plot(t_eval, N0, color='red', label=r'$N_0$')
-    # fig.legend()
+def widthN0_t_plot_variational(ax_width, ax_N0, t=None, N0=None, width=None, paths=None):
+    paths = paths or {}
+    if (t is None or N0 is None or width is None) and 'solution_loadpath' in paths:
+        solution = np.load(paths['solution_loadpath'])
+        t = solution['t'] if t is None else t
+        N0 = solution['N0'] if N0 is None else N0
+        width = solution['width'] if width is None else width
+    if any(v is None for v in (t, N0, width)):
+        raise ValueError("Arguments missing: t, N0 or width")
+    ax_width.plot(t, width)
+    ax_N0.plot(t, N0, color='red')
+    
+def create_radiusN0_t_plot_variational(t=None, N0=None, width=None, paths=None):
+    paths = paths or {}
+    if (t is None or N0 is None or width is None) and 'solution_loadpath' in paths:
+        solution = np.load(paths['solution_loadpath'])
+        t = solution['t'] if t is None else t
+        N0 = solution['N0'] if N0 is None else N0
+        width = solution['width'] if width is None else width
+    if any(v is None for v in (t, N0, width)):
+        raise ValueError("Arguments missing: t, N0 or width")
+    fig, ax_width = plt.subplots()
+    ax_width.set_xlabel('t')
+    ax_width.set_ylabel('width')
+    ax_N0 = ax_width.twinx()
+    ax_N0.set_ylabel(r'$N_0$')
+    widthN0_t_plot_variational(ax_width, ax_N0, t=t, N0=N0, width=width)
     fig.tight_layout()
-
     plt.show()
 
 # print(sp.latex(derive_R_thomasfermi()))
-radius_t_plot_variational(ansatz='thomas-fermi')
+if __name__=='__main__':
+    cases = {'g_before': (0.0103,), 'g': (0.01,), 'N0_eq': (int(1e6),), 'gamma':(0.04,)}
+    thomasfermi_solution_path = 'saves/breathing_mode/variational/thomasfermi_time_ev_gbefore{g_before}_g{g}_N0{N0_eq}_gamma{gamma}.npz'
+    gaussian_solution_path = 'saves/breathing_mode/variational/gaussian_time_ev_gbefore{g_before}_g{g}_N0{N0_eq}_gamma{gamma}.npz'
+    t_max = 30
+    dt = 1e-2
+    # execute_for_param_cases(gaussian_time_ev_from_groundstate, cases=cases, t_max=t_max, dt=dt, paths={'solution_savepath':gaussian_solution_path})
+    execute_for_param_cases(thomasfermi_time_ev_from_groundstate, cases=cases, t_max=t_max, dt=dt, paths={'solution_savepath':thomasfermi_solution_path})
+    # execute_for_param_cases(create_radiusN0_t_plot_variational, cases=cases, paths={'solution_loadpath': gaussian_solution_path})
+    execute_for_param_cases(create_radiusN0_t_plot_variational, cases=cases, paths={'solution_loadpath': thomasfermi_solution_path})
+
